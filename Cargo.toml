@@ -1,0 +1,15 @@
+[package]
+name = "otp"
+version = "0.1.0"
+authors = ["Naim A. <naim94a@gmail.com>"]
+description = "One Time Password generator"
+license = "GPLv3"
+
+[dependencies]
+rand = "0.3.0"
+base32 = "0.3.1"
+ring = "0.12.1"
+
+[lib]
+name = "libotp"
+crate-type = ["lib"]
