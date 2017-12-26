@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/naim94a/otp.svg?branch=master)](https://travis-ci.org/naim94a/otp)
+
 **libotp** implements RFC4226 and RFC6328.
 These RFCs are implemented by Google's Google Authenticator.
 
