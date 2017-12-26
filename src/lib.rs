@@ -1,4 +1,3 @@
-extern crate rand;
 extern crate ring;
 extern crate base32;
 
@@ -26,7 +25,7 @@ impl HOTP {
     /// # Arguments
     ///
     /// * `algorithm` - Algorithm to use for OTP generation.
-    pub fn new(algorithm: HOTPAlgorithm) -> Result<HOTP, std::io::Error> {
+    pub fn new(algorithm: HOTPAlgorithm) -> Result<HOTP, ring::error::Unspecified> {
         let algo = HOTP::get_algorithm(algorithm);
 
         match HOTP::generate_secret(algo.output_len) {
@@ -77,17 +76,14 @@ impl HOTP {
         }
     }
 
-    fn generate_secret(size: usize) -> Result<Vec<u8>, std::io::Error> {
-        use rand::Rng;
+    fn generate_secret(size: usize) -> Result<Vec<u8>, ring::error::Unspecified> {
+        use ring::rand::SecureRandom;
 
-        match rand::OsRng::new() {
-            Ok(mut rng) => {
-                let mut secret: Vec<u8> = Vec::with_capacity(size);
+        let mut secret: Vec<u8> = vec![0; size];
+        let rand = ring::rand::SystemRandom::new();
 
-                for _ in 0..size {
-                    secret.push( rng.next_u32() as u8 );
-                }
-
+        match rand.fill(secret.as_mut()) {
+            Ok(_) => {
                 Result::Ok(secret)
             },
             Err(err) => {
