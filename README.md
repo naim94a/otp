@@ -1,6 +1,6 @@
 [![Build Status](https://travis-ci.org/naim94a/otp.svg?branch=master)](https://travis-ci.org/naim94a/otp)
 
-**libotp** implements RFC4226 and RFC6328.
+**libotp** implements RFC4226 and RFC6238.
 These RFCs are implemented by Google's Google Authenticator.
 
 OTP can increases the security for various things, such as web services, servers and even private computers.
@@ -16,6 +16,6 @@ It is possible to work in two modes:
 ## Features
 * HTOP - HMAC One-Time-Password generation ([RFC4226](https://tools.ietf.org/html/rfc4226)).
     * Configurable HMAC - SHA1, SHA256 or SHA512.
-* TOTP - Time based One-Time-Password generation ([RFC6328](https://tools.ietf.org/html/rfc6238)).
+* TOTP - Time based One-Time-Password generation ([RFC6238](https://tools.ietf.org/html/rfc6238)).
     * Configurable time step, RFC recommended is 30 seconds.
     * Configurable T0 (start time).
