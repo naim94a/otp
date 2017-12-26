@@ -2,6 +2,8 @@ extern crate rand;
 extern crate ring;
 extern crate base32;
 
+mod utils;
+
 #[derive(Copy, Clone)]
 pub enum HOTPAlgorithm {
     HMACSHA1,
@@ -135,13 +137,6 @@ impl TOTP {
         }
     }
 
-    fn get_byte_at(num: u64, idx: u32) -> u8 {
-        let bits_offset = idx * 8;
-        let byte_mask: u64 = 0xff << bits_offset;
-
-        ((num & byte_mask) >> bits_offset) as u8
-    }
-
     fn get_time(&self) -> u64 {
         let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap();
         return (now.as_secs() + self.start_time) / self.time_step;
@@ -153,21 +148,8 @@ impl TOTP {
     /// * `digits` - Desired OTP length, should be at least 6.
     /// * `offset` - Should be 0 for current time frame, -1 for previous, 1 for next, etc...
     pub fn get_otp(&self, digits: u32, offset: i32) -> u32 {
-        let buf: &[u8] = &TOTP::num_to_buffer(((self.get_time() as i64) + (offset as i64)) as u64 );
+        let buf: &[u8] = &utils::num_to_buffer(((self.get_time() as i64) + (offset as i64)) as u64 );
         return self.secret.get_otp(buf, digits);
-    }
-
-    fn num_to_buffer(num: u64) -> [u8; 8] {
-        [
-            TOTP::get_byte_at(num, 7),
-            TOTP::get_byte_at(num, 6),
-            TOTP::get_byte_at(num, 5),
-            TOTP::get_byte_at(num, 4),
-            TOTP::get_byte_at(num, 3),
-            TOTP::get_byte_at(num, 2),
-            TOTP::get_byte_at(num, 1),
-            TOTP::get_byte_at(num, 0),
-        ]
     }
 }
 
@@ -187,14 +169,6 @@ fn test_gen_secret() {
 fn test_dynamic_trunc() {
     let num = HOTPSecret::get_hotp_value(&[31, 134, 152, 105, 14, 2, 202, 22, 97, 133, 80, 239, 127, 25, 218, 142, 148, 91, 85, 90]);
     assert_eq!(num, 0x50ef7f19);
-}
-
-#[test]
-fn test_byte_at() {
-    println!("A");
-    for i in 0..8 {
-        TOTP::get_byte_at(0x0fedcba987654321, i);
-    }
 }
 
 #[test]
@@ -239,12 +213,12 @@ fn test_secret() {
 #[test]
 fn test_time_to_counter() {
     const STEP: u64 = 30;
-    assert_eq!(&TOTP::num_to_buffer((59 / STEP))[..], &[0, 0, 0, 0, 0, 0, 0, 1]);
-    assert_eq!(&TOTP::num_to_buffer((1111111109 / STEP))[..], &[0, 0, 0, 0, 0x02, 0x35, 0x23, 0xec]);
-    assert_eq!(&TOTP::num_to_buffer((1111111111 / STEP))[..], &[0, 0, 0, 0, 0x02, 0x35, 0x23, 0xed]);
-    assert_eq!(&TOTP::num_to_buffer((1234567890 / STEP))[..], &[0, 0, 0, 0, 0x02, 0x73, 0xef, 0x07]);
-    assert_eq!(&TOTP::num_to_buffer((2000000000 / STEP))[..], &[0, 0, 0, 0, 0x03, 0xf9, 0x40, 0xaa]);
-    assert_eq!(&TOTP::num_to_buffer((20000000000 / STEP))[..], &[0, 0, 0, 0, 0x27, 0xbc, 0x86, 0xaa]);
+    assert_eq!(&utils::num_to_buffer((59 / STEP))[..], &[0, 0, 0, 0, 0, 0, 0, 1]);
+    assert_eq!(&utils::num_to_buffer((1111111109 / STEP))[..], &[0, 0, 0, 0, 0x02, 0x35, 0x23, 0xec]);
+    assert_eq!(&utils::num_to_buffer((1111111111 / STEP))[..], &[0, 0, 0, 0, 0x02, 0x35, 0x23, 0xed]);
+    assert_eq!(&utils::num_to_buffer((1234567890 / STEP))[..], &[0, 0, 0, 0, 0x02, 0x73, 0xef, 0x07]);
+    assert_eq!(&utils::num_to_buffer((2000000000 / STEP))[..], &[0, 0, 0, 0, 0x03, 0xf9, 0x40, 0xaa]);
+    assert_eq!(&utils::num_to_buffer((20000000000 / STEP))[..], &[0, 0, 0, 0, 0x27, 0xbc, 0x86, 0xaa]);
 }
 
 #[test]
