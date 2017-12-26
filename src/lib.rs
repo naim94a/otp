@@ -2,17 +2,24 @@
 //!
 //! # Examples
 //! ```
-//! use libotp::{HOTP, TOTP};
+//! use libotp::{HOTP, TOTP, HOTPAlgorithm};
 //!
 //! const TOTP_STEP: u64 = 30;
 //! const OTP_DIGITS: u32 = 8;
+//! #
+//! # struct User {}
+//! # impl<'a> User {
+//! #     fn get_totp_secret(&self) -> &'a [u8] {
+//! #         &[1,2,3,4]
+//! #     }
+//! # }
 //!
 //! fn check_user_otp(user: User, guess: u32) -> bool {
 //!     // get the shared secret from some database.
 //!     let secret = user.get_totp_secret();
 //!
 //!     // create a HOTP instance & TOTP instance
-//!     let hotp = HOTP::from_bin(secret);
+//!     let hotp = HOTP::from_bin(secret, HOTPAlgorithm::HMACSHA1);
 //!     let totp = TOTP::new(hotp, TOTP_STEP, 0);
 //!
 //!     // validate guess with TOTP
@@ -24,7 +31,7 @@
 //!     let secret = user.get_totp_secret();
 //!
 //!     return TOTP::new(
-//!         HOTP::from_bin(secret),
+//!         HOTP::from_bin(secret, HOTPAlgorithm::HMACSHA1),
 //!         TOTP_STEP,
 //!         0).get_otp(OTP_DIGITS, 0);
 //! }
@@ -225,9 +232,7 @@ impl TOTP {
     /// * `guess` - The user provided guess to validate.
     /// * `buffer` - Amount of OTPs to check before and after the current one (0=Only current, 1=Previous+Now+Next OTP, etc...)
     pub fn validate(&self, digits: u32, guess: u32, buffer: u32) -> bool {
-        let current_otp = self.get_otp(digits, 0);
-
-        for offset in -(buffer as i32)..(buffer + 1) {
+        for offset in -(buffer as i32)..((buffer + 1) as i32) {
             if self.get_otp(digits, offset) == guess {
                 return true;
             }
