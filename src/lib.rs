@@ -26,13 +26,19 @@ impl HOTP {
     /// # Arguments
     ///
     /// * `algorithm` - Algorithm to use for OTP generation.
-    pub fn new(algorithm: HOTPAlgorithm) -> HOTP {
-
+    pub fn new(algorithm: HOTPAlgorithm) -> Result<HOTP, std::io::Error> {
         let algo = HOTP::get_algorithm(algorithm);
 
-        HOTP {
-            secret: HOTP::generate_secret(algo.output_len),
-            algorithm,
+        match HOTP::generate_secret(algo.output_len) {
+            Ok(secret) => {
+                Result::Ok(HOTP {
+                    secret,
+                    algorithm,
+                })
+            },
+            Err(err) => {
+                Result::Err(err)
+            }
         }
     }
 
@@ -49,10 +55,18 @@ impl HOTP {
     /// # Arguments
     ///
     /// * `data` - base32 encoded secret to load.
-    pub fn from_base32(data: &str, algorithm: HOTPAlgorithm) -> HOTP {
-        HOTP {
-            secret: base32::decode(base32::Alphabet::RFC4648 {padding: false}, data).unwrap(),
-            algorithm,
+    pub fn from_base32(data: &str, algorithm: HOTPAlgorithm) -> Result<HOTP, ()> {
+        let secret = base32::decode(base32::Alphabet::RFC4648 {padding: false}, data);
+        match secret {
+            Some(secret) => {
+                Result::Ok(HOTP {
+                    secret,
+                    algorithm,
+                })
+            },
+            None => {
+                Result::Err(())
+            }
         }
     }
 
@@ -63,18 +77,23 @@ impl HOTP {
         }
     }
 
-    fn generate_secret(size: usize) -> Vec<u8> {
+    fn generate_secret(size: usize) -> Result<Vec<u8>, std::io::Error> {
         use rand::Rng;
 
-        let mut secret: Vec<u8> = Vec::with_capacity(size);
+        match rand::OsRng::new() {
+            Ok(mut rng) => {
+                let mut secret: Vec<u8> = Vec::with_capacity(size);
 
-        let mut rng = rand::OsRng::new().unwrap();
+                for _ in 0..size {
+                    secret.push( rng.next_u32() as u8 );
+                }
 
-        for _ in 0..size {
-            secret.push( rng.next_u32() as u8 );
+                Result::Ok(secret)
+            },
+            Err(err) => {
+                Result::Err(err)
+            }
         }
-
-        return secret;
     }
 
     /// Exports the HOTP Secret as base32 encoded string.
@@ -155,13 +174,13 @@ impl TOTP {
 
 #[test]
 fn test_gen_secret() {
-    let hotp_sha1 = HOTP::new(HOTPAlgorithm::HMACSHA1);
+    let hotp_sha1 = HOTP::new(HOTPAlgorithm::HMACSHA1).unwrap();
     assert_eq!(hotp_sha1.secret.len(), 20);
 
-    let hotp_sha256 = HOTP::new(HOTPAlgorithm::HMACSHA256);
+    let hotp_sha256 = HOTP::new(HOTPAlgorithm::HMACSHA256).unwrap();
     assert_eq!(hotp_sha256.secret.len(), 32);
 
-    let hotp_sha512 = HOTP::new(HOTPAlgorithm::HMACSHA512);
+    let hotp_sha512 = HOTP::new(HOTPAlgorithm::HMACSHA512).unwrap();
     assert_eq!(hotp_sha512.secret.len(), 64);
 }
 
