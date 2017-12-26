@@ -1,3 +1,35 @@
+//! HMAC and Time-Based One-Time-Password implementations based on RFC4226 and RFC6238.
+//!
+//! # Examples
+//! ```
+//! use libotp::{HOTP, TOTP};
+//!
+//! const TOTP_STEP: u64 = 30;
+//! const OTP_DIGITS: u32 = 8;
+//!
+//! fn check_user_otp(user: User, guess: u32) -> bool {
+//!     // get the shared secret from some database.
+//!     let secret = user.get_totp_secret();
+//!
+//!     // create a HOTP instance & TOTP instance
+//!     let hotp = HOTP::from_bin(secret);
+//!     let totp = TOTP::new(hotp, TOTP_STEP, 0);
+//!
+//!     // validate guess with TOTP
+//!     return totp.validate(OTP_DIGITS, guess, 0);
+//! }
+//!
+//! fn get_user_otp(user: User) -> u32 {
+//!     // get shared secret
+//!     let secret = user.get_totp_secret();
+//!
+//!     return TOTP::new(
+//!         HOTP::from_bin(secret),
+//!         TOTP_STEP,
+//!         0).get_otp(OTP_DIGITS, 0);
+//! }
+//! ```
+
 extern crate ring;
 extern crate base32;
 
@@ -69,6 +101,11 @@ impl HOTP {
         }
     }
 
+    /// Loads the HOTP secret from a given `[u8]`.
+    ///
+    /// # Arguments
+    /// * `data` - The shared secret.
+    /// * `algorithm` - Algorithm used for OTP generation.
     pub fn from_bin(data: &[u8], algorithm: HOTPAlgorithm) -> HOTP {
         HOTP {
             secret: Vec::from(data),
@@ -123,6 +160,20 @@ impl HOTP {
             | ((data[offset + 3] & 0xff) as u32);
         return result;
     }
+
+    /// Validates the given OTP
+    ///
+    /// # Arguments
+    /// * `counter` - The counter to test against.
+    /// * `digits` - The OTPs length.
+    /// * `guess` - A user provided guess to validate.
+    ///
+    /// # Note
+    /// It is recommended to check the following counters in case the user skipped an OTP.
+    /// You should verify that an OTP with the same counter was not already used.
+    pub fn validate(&self, counter: &[u8], digits: u32, guess: u32) -> bool {
+        self.get_otp(counter, digits) == guess
+    }
 }
 
 /// Provides Time based One Time Passwords.
@@ -165,6 +216,23 @@ impl TOTP {
     pub fn get_otp(&self, digits: u32, offset: i32) -> u32 {
         let buf: &[u8] = &utils::num_to_buffer(((self.get_time() as i64) + (offset as i64)) as u64 );
         return self.secret.get_otp(buf, digits);
+    }
+
+    /// Validates the given OTP.
+    ///
+    /// # Arguments
+    /// * `digits` - The amount of digits set for the OTP.
+    /// * `guess` - The user provided guess to validate.
+    /// * `buffer` - Amount of OTPs to check before and after the current one (0=Only current, 1=Previous+Now+Next OTP, etc...)
+    pub fn validate(&self, digits: u32, guess: u32, buffer: u32) -> bool {
+        let current_otp = self.get_otp(digits, 0);
+
+        for offset in -(buffer as i32)..(buffer + 1) {
+            if self.get_otp(digits, offset) == guess {
+                return true;
+            }
+        }
+        return false;
     }
 }
 
