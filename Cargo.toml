@@ -1,9 +1,13 @@
 [package]
-name = "otp"
-version = "0.1.0"
+name = "libotp"
+version = "0.1.1"
 authors = ["Naim A. <naim94a@gmail.com>"]
 description = "One Time Password generator"
-license = "GPLv3"
+license = "GPL-3.0"
+repository = "https://github.com/naim94a/otp"
+readme = "README.md"
+keywords = ["RFC4226", "RFC6238", "OTP", "Authentication"]
+categories = ["authentication"]
 
 [dependencies]
 rand = "0.3.0"
@@ -13,3 +17,7 @@ ring = "0.12.1"
 [lib]
 name = "libotp"
 crate-type = ["lib"]
+
+[badges]
+travis-ci = {repository = "naim94a/otp"}
+maintenance = { status = "actively-developed" }
