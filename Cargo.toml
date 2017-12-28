@@ -1,6 +1,6 @@
 [package]
 name = "libotp"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Naim A. <naim94a@gmail.com>"]
 description = "One Time Password generator"
 license = "GPL-3.0"
