@@ -2,7 +2,7 @@
 //!
 //! # Examples
 //! ```
-//! use libotp::{HOTP, TOTP, HOTPAlgorithm};
+//! use libotp::{HOTP, TOTP};
 //!
 //! const TOTP_STEP: u64 = 30;
 //! const OTP_DIGITS: u32 = 8;
@@ -19,7 +19,7 @@
 //!     let secret = user.get_totp_secret();
 //!
 //!     // create a HOTP instance & TOTP instance
-//!     let hotp = HOTP::from_bin(secret, HOTPAlgorithm::HMACSHA1);
+//!     let hotp = HOTP::from_bin(secret).unwrap();
 //!     let totp = TOTP::new(hotp, TOTP_STEP, 0);
 //!
 //!     // validate guess with TOTP
@@ -31,7 +31,7 @@
 //!     let secret = user.get_totp_secret();
 //!
 //!     return TOTP::new(
-//!         HOTP::from_bin(secret, HOTPAlgorithm::HMACSHA1),
+//!         HOTP::from_bin(secret).unwrap(),
 //!         TOTP_STEP,
 //!         0).get_otp(OTP_DIGITS, 0);
 //! }
@@ -47,6 +47,33 @@ pub enum HOTPAlgorithm {
     HMACSHA1,
     HMACSHA256,
     HMACSHA512,
+}
+
+impl HOTPAlgorithm {
+    pub fn from_buffer_len(buffer_length: usize) -> Option<HOTPAlgorithm> {
+        match buffer_length {
+            ring::digest::SHA1_OUTPUT_LEN => {
+                Option::Some(HOTPAlgorithm::HMACSHA1)
+            },
+            ring::digest::SHA256_OUTPUT_LEN => {
+                Option::Some(HOTPAlgorithm::HMACSHA256)
+            },
+            ring::digest::SHA512_OUTPUT_LEN => {
+                Option::Some(HOTPAlgorithm::HMACSHA512)
+            },
+            _ => {
+                Option::None
+            },
+        }
+    }
+
+    pub fn get_algorithm<'a>(&self) -> &'a ring::digest::Algorithm {
+        match *self {
+            HOTPAlgorithm::HMACSHA1 => &ring::digest::SHA1,
+            HOTPAlgorithm::HMACSHA256 => &ring::digest::SHA256,
+            HOTPAlgorithm::HMACSHA512 => &ring::digest::SHA512,
+        }
+    }
 }
 
 /// This is the secret that will be used to generate HMAC based one-time-passwords.
@@ -65,7 +92,7 @@ impl HOTP {
     ///
     /// * `algorithm` - Algorithm to use for OTP generation.
     pub fn new(algorithm: HOTPAlgorithm) -> Result<HOTP, ring::error::Unspecified> {
-        let algo = HOTP::get_algorithm(algorithm);
+        let algo = algorithm.get_algorithm();
 
         match HOTP::generate_secret(algo.output_len) {
             Ok(secret) => {
@@ -80,27 +107,28 @@ impl HOTP {
         }
     }
 
-    fn get_algorithm<'a>(algorithm: HOTPAlgorithm) -> &'a ring::digest::Algorithm {
-        match algorithm {
-            HOTPAlgorithm::HMACSHA1 => &ring::digest::SHA1,
-            HOTPAlgorithm::HMACSHA256 => &ring::digest::SHA256,
-            HOTPAlgorithm::HMACSHA512 => &ring::digest::SHA512,
-        }
-    }
-
     /// Loads a base32 encoded secret.
     ///
     /// # Arguments
     ///
     /// * `data` - base32 encoded secret to load.
-    pub fn from_base32(data: &str, algorithm: HOTPAlgorithm) -> Result<HOTP, ()> {
+    pub fn from_base32(data: &str) -> Result<HOTP, ()> {
         let secret = base32::decode(base32::Alphabet::RFC4648 {padding: false}, data);
+
         match secret {
             Some(secret) => {
-                Result::Ok(HOTP {
-                    secret,
-                    algorithm,
-                })
+                let algorithm = HOTPAlgorithm::from_buffer_len(secret.len());
+                match algorithm {
+                    Some(algorithm) => {
+                        Result::Ok(HOTP{
+                            secret,
+                            algorithm,
+                        })
+                    },
+                    None => {
+                        Result::Err(())
+                    }
+                }
             },
             None => {
                 Result::Err(())
@@ -113,11 +141,15 @@ impl HOTP {
     /// # Arguments
     /// * `data` - The shared secret.
     /// * `algorithm` - Algorithm used for OTP generation.
-    pub fn from_bin(data: &[u8], algorithm: HOTPAlgorithm) -> HOTP {
-        HOTP {
-            secret: Vec::from(data),
-            algorithm,
+    pub fn from_bin(data: &[u8]) -> Result<HOTP, ()> {
+        let algorithm = HOTPAlgorithm::from_buffer_len(data.len());
+        if algorithm.is_none() {
+            return Result::Err(());
         }
+        Result::Ok(HOTP {
+            secret: Vec::from(data),
+            algorithm: algorithm.unwrap(),
+        })
     }
 
     fn generate_secret(size: usize) -> Result<Vec<u8>, ring::error::Unspecified> {
@@ -148,7 +180,7 @@ impl HOTP {
     /// * `counter` - Password's counter. This counter value should never be reused for security reasons.
     /// * `digits` - Desired OTP length, this value should be at least 6.
     pub fn get_otp(&self, counter: &[u8], digits: u32) -> u32 {
-        let algorithm = HOTP::get_algorithm(self.algorithm);
+        let algorithm = self.algorithm.get_algorithm();
 
         let signer = ring::hmac::SigningKey::new(algorithm, self.secret.as_slice());
         let hmac = ring::hmac::sign(&signer, counter);
@@ -251,6 +283,35 @@ fn test_gen_secret() {
 
     let hotp_sha512 = HOTP::new(HOTPAlgorithm::HMACSHA512).unwrap();
     assert_eq!(hotp_sha512.secret.len(), 64);
+}
+
+#[test]
+fn test_hotp_from_bin() {
+    // SHA1
+    HOTP::from_bin(&[0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a,
+        0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14]).unwrap();
+
+    // SHA256
+    HOTP::from_bin(&[0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a,
+        0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14,
+        0x15, 0x16, 0x17, 0x18, 0x19, 0x20, 0x21, 0x22, 0x23, 0x24,
+        0x25, 0x26]).unwrap();
+
+    // SHA512
+    HOTP::from_bin(&[0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a,
+        0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14,
+        0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e,
+        0x1f, 0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28,
+        0x29, 0x2a, 0x2b, 0x2c, 0x2d, 0x2e, 0x2f, 0x30, 0x31, 0x32,
+        0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3a, 0x3b, 0x3c,
+        0x3d, 0x3e, 0x3f, 0x40]).unwrap();
+}
+
+#[test]
+fn test_hotm_from_base32() {
+    HOTP::from_base32("AEBAGBAFAYDQQCIKBMGA2DQPCAIREEYU").unwrap();
+    HOTP::from_base32("AEBAGBAFAYDQQCIKBMGA2DQPCAIREEYUCULBOGAZDINRYHI6D4QA====").unwrap();
+    HOTP::from_base32("AEBAGBAFAYDQQCIKBMGA2DQPCAIREEYUCULBOGAZDINRYHI6D4QCCIRDEQSSMJZIFEVCWLBNFYXTAMJSGM2DKNRXHA4TUOZ4HU7D6QA=").unwrap();
 }
 
 #[test]
