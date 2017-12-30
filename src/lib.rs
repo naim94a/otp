@@ -273,6 +273,63 @@ impl TOTP {
     }
 }
 
+/// HMAC One Time Password function
+///
+/// # Arguments
+/// * `counter` - A 64-bit counter for HOTP
+/// * `secret` - A base32 encoded secret
+/// * `digits` - Desired OTP length in digits. 6+ is recommended.
+///
+/// # Notes
+/// This function converts the counter to it's 64 bit little endian representation.
+/// If you have other requirements, please use the HOTP struct directly.
+pub fn hotp(counter: u64, secret: &str, digits: u32) -> Option<u32> {
+    match HOTP::from_base32(secret) {
+        Ok(otp) => {
+            let counter_bytes = &utils::num_to_buffer(counter);
+            Option::Some(otp.get_otp(counter_bytes, digits))
+        },
+        Err(_) => {
+            Option::None
+        }
+    }
+}
+
+/// Time based One Time Password function
+///
+/// # Arguments
+/// * `secret` - base32 encoded shared-secret.
+/// * `digits` - Desired OTP length in digits. 6+ is recommended.
+/// * `time_step` - Time frame for OTP is seconds.
+/// * `time_start` - Beginning of time for this TOTP.
+///
+/// # Example Usage
+/// ```
+/// use libotp::totp;
+/// const MY_SECRET: &str = "VMNW2EC7X3OCJHITBVSVZW5MVCUIL5SR";
+///
+/// fn main() {
+///     match totp(MY_SECRET, 6, 30, 0) {
+///         Some(otp) => {
+///             println!("Your current OTP is: {:06}", otp);
+///         },
+///         None => {
+///             println!("Failed to calculate OTP.");
+///         }
+///     }
+/// }
+/// ```
+pub fn totp(secret: &str, digits: u32, time_step: u64, time_start: u64) -> Option<u32> {
+    match HOTP::from_base32(secret) {
+        Ok(otp) => {
+            Option::Some(TOTP::new(otp, time_step, time_start).get_otp(digits, 0))
+        },
+        Err(_) => {
+            Option::None
+        }
+    }
+}
+
 #[test]
 fn test_gen_secret() {
     let hotp_sha1 = HOTP::new(HOTPAlgorithm::HMACSHA1).unwrap();
