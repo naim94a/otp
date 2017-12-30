@@ -2,38 +2,30 @@
 //!
 //! # Examples
 //! ```
-//! use libotp::{HOTP, TOTP};
+//! use libotp::{totp, validate_totp};
 //!
 //! const TOTP_STEP: u64 = 30;
 //! const OTP_DIGITS: u32 = 8;
 //! #
 //! # struct User {}
 //! # impl<'a> User {
-//! #     fn get_totp_secret(&self) -> &'a [u8] {
-//! #         &[1,2,3,4]
+//! #     fn get_totp_secret(&self) -> &'a str {
+//! #         "SomeBase32EncodedSecret"
 //! #     }
 //! # }
 //!
-//! fn check_user_otp(user: User, guess: u32) -> bool {
+//! fn check_user_otp(user: User, guess: u32) -> Option<bool> {
 //!     // get the shared secret from some database.
 //!     let secret = user.get_totp_secret();
 //!
-//!     // create a HOTP instance & TOTP instance
-//!     let hotp = HOTP::from_bin(secret).unwrap();
-//!     let totp = TOTP::new(hotp, TOTP_STEP, 0);
-//!
-//!     // validate guess with TOTP
-//!     return totp.validate(OTP_DIGITS, guess, 0);
+//!     validate_totp(guess, 1, secret, OTP_DIGITS, TOTP_STEP, 0)
 //! }
 //!
-//! fn get_user_otp(user: User) -> u32 {
+//! fn get_user_otp(user: User) -> Option<u32> {
 //!     // get shared secret
 //!     let secret = user.get_totp_secret();
 //!
-//!     return TOTP::new(
-//!         HOTP::from_bin(secret).unwrap(),
-//!         TOTP_STEP,
-//!         0).get_otp(OTP_DIGITS, 0);
+//!     totp(secret, OTP_DIGITS, TOTP_STEP, 0)
 //! }
 //! ```
 
@@ -323,6 +315,55 @@ pub fn totp(secret: &str, digits: u32, time_step: u64, time_start: u64) -> Optio
     match HOTP::from_base32(secret) {
         Ok(otp) => {
             Option::Some(TOTP::new(otp, time_step, time_start).get_otp(digits, 0))
+        },
+        Err(_) => {
+            Option::None
+        }
+    }
+}
+
+/// Validates HOTP inputs
+///
+/// # Arguments
+/// * `input` - End user's input
+/// * `validation_margin` - The validation will check this amount of OTPs before and after the current one.
+/// * `counter` - End user's currnet OTP counter.
+/// * `secret` - base32 encoded shared-secret.
+/// * `digits` - OTP length in digits. At least 6 is recommended.
+///
+/// # Notes
+/// The program using this function should check that the provided input was not already used.
+pub fn validate_hotp(input: u32, validation_margin: i32, counter: u64, secret: &str, digits: u32) -> Option<bool> {
+    match HOTP::from_base32(secret) {
+        Ok(hotp) => {
+            for i in (-validation_margin)..(validation_margin+1) {
+                let current_counter = (counter as i64) + (i as i64);
+                if hotp.get_otp(&utils::num_to_buffer(current_counter as u64), digits) == input {
+                    return Option::Some(true);
+                }
+            }
+            Option::Some(false)
+        },
+        Err(_) => {
+            Option::None
+        }
+    }
+}
+
+/// Validates a user provided TOTP.
+///
+/// # Arguments
+/// * `input` - End user provided input
+/// * `validation_margin` - Checks this amount of OTP steps before and after the current OTP.
+/// * `secret` - A base32 encoded shared-secret.
+/// * `digits` - OTP length in digits. At least 6 is recommended.
+/// * `time_step` - Time frame for OTPs.
+/// * `time_start` - The beginning of time for this OTP (T0).
+pub fn validate_totp(input: u32, validation_margin: u32, secret: &str, digits: u32, time_step: u64, time_start: u64) -> Option<bool> {
+    match HOTP::from_base32(secret) {
+        Ok(hotp) => {
+            let totp = TOTP::new(hotp, time_step, time_start);
+            Option::Some(totp.validate(digits, input, validation_margin))
         },
         Err(_) => {
             Option::None
