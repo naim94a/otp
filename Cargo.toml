@@ -10,8 +10,8 @@ keywords = ["RFC4226", "RFC6238", "OTP", "Authentication"]
 categories = ["authentication"]
 
 [dependencies]
-ring = "0.13.2"
-binascii = "0.1.1"
+ring = "^0.14"
+binascii = "^0.1"
 
 [lib]
 name = "libotp"
