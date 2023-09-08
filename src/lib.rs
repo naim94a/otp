@@ -46,9 +46,6 @@ pub enum HOTPAlgorithm {
 impl HOTPAlgorithm {
     pub fn from_buffer_len(buffer_length: usize) -> Option<HOTPAlgorithm> {
         match buffer_length {
-            ring::digest::SHA1_OUTPUT_LEN => {
-                Option::Some(HOTPAlgorithm::HMACSHA1)
-            },
             ring::digest::SHA256_OUTPUT_LEN => {
                 Option::Some(HOTPAlgorithm::HMACSHA256)
             },
@@ -56,16 +53,17 @@ impl HOTPAlgorithm {
                 Option::Some(HOTPAlgorithm::HMACSHA512)
             },
             _ => {
-                Option::None
+                Option::Some(HOTPAlgorithm::HMACSHA1)
             },
         }
     }
 
-    pub fn get_algorithm<'a>(&self) -> &'a ring::digest::Algorithm {
+    pub fn get_algorithm(&self) -> ring::hmac::Algorithm {
+        
         match *self {
-            HOTPAlgorithm::HMACSHA1 => &ring::digest::SHA1,
-            HOTPAlgorithm::HMACSHA256 => &ring::digest::SHA256,
-            HOTPAlgorithm::HMACSHA512 => &ring::digest::SHA512,
+            HOTPAlgorithm::HMACSHA1 => ring::hmac::HMAC_SHA1_FOR_LEGACY_USE_ONLY,
+            HOTPAlgorithm::HMACSHA256 => ring::hmac::HMAC_SHA256,
+            HOTPAlgorithm::HMACSHA512 => ring::hmac::HMAC_SHA512,
         }
     }
 }
@@ -88,7 +86,7 @@ impl HOTP {
     pub fn new(algorithm: HOTPAlgorithm) -> Result<HOTP, ring::error::Unspecified> {
         let algo = algorithm.get_algorithm();
 
-        match HOTP::generate_secret(algo.output_len) {
+        match HOTP::generate_secret(algo.digest_algorithm().output_len) {
             Ok(secret) => {
                 Result::Ok(HOTP {
                     secret,
@@ -183,7 +181,7 @@ impl HOTP {
     pub fn get_otp(&self, counter: &[u8], digits: u32) -> u32 {
         let algorithm = self.algorithm.get_algorithm();
 
-        let signer = ring::hmac::SigningKey::new(algorithm, self.secret.as_slice());
+        let signer = ring::hmac::Key::new(algorithm, self.secret.as_slice());
         let hmac = ring::hmac::sign(&signer, counter);
         let block = hmac.as_ref();
         let num = HOTP::get_hotp_value(block);
