@@ -46,9 +46,6 @@ pub enum HOTPAlgorithm {
 impl HOTPAlgorithm {
     pub fn from_buffer_len(buffer_length: usize) -> Option<HOTPAlgorithm> {
         match buffer_length {
-            ring::digest::SHA1_OUTPUT_LEN => {
-                Option::Some(HOTPAlgorithm::HMACSHA1)
-            },
             ring::digest::SHA256_OUTPUT_LEN => {
                 Option::Some(HOTPAlgorithm::HMACSHA256)
             },
@@ -56,7 +53,7 @@ impl HOTPAlgorithm {
                 Option::Some(HOTPAlgorithm::HMACSHA512)
             },
             _ => {
-                Option::None
+                Option::Some(HOTPAlgorithm::HMACSHA1)
             },
         }
     }
