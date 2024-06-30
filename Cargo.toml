@@ -1,6 +1,6 @@
 [package]
 name = "libotp"
-version = "0.1.4"
+version = "0.2.0"
 authors = ["Naim A. <naim94a@gmail.com>"]
 description = "One Time Password generator"
 license = "GPL-3.0"
@@ -16,6 +16,3 @@ binascii = "^0.1"
 [lib]
 name = "libotp"
 crate-type = ["lib"]
-
-[badges]
-travis-ci = {repository = "naim94a/otp"}
