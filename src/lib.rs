@@ -30,10 +30,11 @@
 //! }
 //! ```
 
-extern crate ring;
 extern crate binascii;
+extern crate ring;
 
-#[cfg(test)] mod tests;
+#[cfg(test)]
+mod tests;
 mod utils;
 
 #[derive(Copy, Clone)]
@@ -46,18 +47,10 @@ pub enum HOTPAlgorithm {
 impl HOTPAlgorithm {
     pub fn from_buffer_len(buffer_length: usize) -> Option<HOTPAlgorithm> {
         match buffer_length {
-            ring::digest::SHA1_OUTPUT_LEN => {
-                Option::Some(HOTPAlgorithm::HMACSHA1)
-            },
-            ring::digest::SHA256_OUTPUT_LEN => {
-                Option::Some(HOTPAlgorithm::HMACSHA256)
-            },
-            ring::digest::SHA512_OUTPUT_LEN => {
-                Option::Some(HOTPAlgorithm::HMACSHA512)
-            },
-            _ => {
-                Option::None
-            },
+            ring::digest::SHA1_OUTPUT_LEN => Option::Some(HOTPAlgorithm::HMACSHA1),
+            ring::digest::SHA256_OUTPUT_LEN => Option::Some(HOTPAlgorithm::HMACSHA256),
+            ring::digest::SHA512_OUTPUT_LEN => Option::Some(HOTPAlgorithm::HMACSHA512),
+            _ => Option::None,
         }
     }
 
@@ -89,15 +82,8 @@ impl HOTP {
         let algo = algorithm.get_algorithm();
 
         match HOTP::generate_secret(algo.output_len) {
-            Ok(secret) => {
-                Result::Ok(HOTP {
-                    secret,
-                    algorithm,
-                })
-            },
-            Err(err) => {
-                Result::Err(err)
-            }
+            Ok(secret) => Result::Ok(HOTP { secret, algorithm }),
+            Err(err) => Result::Err(err),
         }
     }
 
@@ -118,15 +104,11 @@ impl HOTP {
 
         let algorithm = HOTPAlgorithm::from_buffer_len(secret.len());
         match algorithm {
-            Some(algorithm) => {
-                Result::Ok(HOTP{
-                    secret: Vec::from(secret),
-                    algorithm,
-                })
-            },
-            None => {
-                Result::Err(())
-            }
+            Some(algorithm) => Result::Ok(HOTP {
+                secret: Vec::from(secret),
+                algorithm,
+            }),
+            None => Result::Err(()),
         }
     }
 
@@ -153,12 +135,8 @@ impl HOTP {
         let rand = ring::rand::SystemRandom::new();
 
         match rand.fill(secret.as_mut()) {
-            Ok(_) => {
-                Result::Ok(secret)
-            },
-            Err(err) => {
-                Result::Err(err)
-            }
+            Ok(_) => Result::Ok(secret),
+            Err(err) => Result::Err(err),
         }
     }
 
@@ -169,8 +147,8 @@ impl HOTP {
             Ok(v) => {
                 let vec = Vec::from(v);
                 String::from_utf8(vec).unwrap()
-            },
-            Err(_) => unreachable!()
+            }
+            Err(_) => unreachable!(),
         }
     }
 
@@ -236,7 +214,7 @@ impl TOTP {
     pub fn new(secret: HOTP, time_step: u64, start_time: u64) -> TOTP {
         assert!(time_step > 0);
 
-        TOTP{
+        TOTP {
             secret,
             time_step,
             start_time,
@@ -244,7 +222,9 @@ impl TOTP {
     }
 
     fn get_time(&self) -> u64 {
-        let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap();
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap();
         return (now.as_secs() + self.start_time) / self.time_step;
     }
 
@@ -254,7 +234,7 @@ impl TOTP {
     /// * `digits` - Desired OTP length, should be at least 6.
     /// * `offset` - Should be 0 for current time frame, -1 for previous, 1 for next, etc...
     pub fn get_otp(&self, digits: u32, offset: i32) -> u32 {
-        let buf: &[u8] = &utils::num_to_buffer(((self.get_time() as i64) + (offset as i64)) as u64 );
+        let buf: &[u8] = &utils::num_to_buffer(((self.get_time() as i64) + (offset as i64)) as u64);
         return self.secret.get_otp(buf, digits);
     }
 
@@ -289,10 +269,8 @@ pub fn hotp(counter: u64, secret: &str, digits: u32) -> Option<u32> {
         Ok(otp) => {
             let counter_bytes = &utils::num_to_buffer(counter);
             Option::Some(otp.get_otp(counter_bytes, digits))
-        },
-        Err(_) => {
-            Option::None
         }
+        Err(_) => Option::None,
     }
 }
 
@@ -322,12 +300,8 @@ pub fn hotp(counter: u64, secret: &str, digits: u32) -> Option<u32> {
 /// ```
 pub fn totp(secret: &str, digits: u32, time_step: u64, time_start: u64) -> Option<u32> {
     match HOTP::from_base32(secret) {
-        Ok(otp) => {
-            Option::Some(TOTP::new(otp, time_step, time_start).get_otp(digits, 0))
-        },
-        Err(_) => {
-            Option::None
-        }
+        Ok(otp) => Option::Some(TOTP::new(otp, time_step, time_start).get_otp(digits, 0)),
+        Err(_) => Option::None,
     }
 }
 
@@ -342,20 +316,24 @@ pub fn totp(secret: &str, digits: u32, time_step: u64, time_start: u64) -> Optio
 ///
 /// # Notes
 /// The program using this function should check that the provided input was not already used.
-pub fn validate_hotp(input: u32, validation_margin: i32, counter: u64, secret: &str, digits: u32) -> Option<bool> {
+pub fn validate_hotp(
+    input: u32,
+    validation_margin: i32,
+    counter: u64,
+    secret: &str,
+    digits: u32,
+) -> Option<bool> {
     match HOTP::from_base32(secret) {
         Ok(hotp) => {
-            for i in (-validation_margin)..(validation_margin+1) {
+            for i in (-validation_margin)..(validation_margin + 1) {
                 let current_counter = (counter as i64) + (i as i64);
                 if hotp.get_otp(&utils::num_to_buffer(current_counter as u64), digits) == input {
                     return Option::Some(true);
                 }
             }
             Option::Some(false)
-        },
-        Err(_) => {
-            Option::None
         }
+        Err(_) => Option::None,
     }
 }
 
@@ -368,14 +346,19 @@ pub fn validate_hotp(input: u32, validation_margin: i32, counter: u64, secret: &
 /// * `digits` - OTP length in digits. At least 6 is recommended.
 /// * `time_step` - Time frame for OTPs.
 /// * `time_start` - The beginning of time for this OTP (T0).
-pub fn validate_totp(input: u32, validation_margin: u32, secret: &str, digits: u32, time_step: u64, time_start: u64) -> Option<bool> {
+pub fn validate_totp(
+    input: u32,
+    validation_margin: u32,
+    secret: &str,
+    digits: u32,
+    time_step: u64,
+    time_start: u64,
+) -> Option<bool> {
     match HOTP::from_base32(secret) {
         Ok(hotp) => {
             let totp = TOTP::new(hotp, time_step, time_start);
             Option::Some(totp.validate(digits, input, validation_margin))
-        },
-        Err(_) => {
-            Option::None
         }
+        Err(_) => Option::None,
     }
 }

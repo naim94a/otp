@@ -1,4 +1,3 @@
-
 fn get_byte_at(num: u64, idx: u32) -> u8 {
     let bits_offset = idx * 8;
     let byte_mask: u64 = 0xff << (bits_offset as u64);
