@@ -10,7 +10,7 @@ keywords = ["RFC4226", "RFC6238", "OTP", "Authentication"]
 categories = ["authentication"]
 
 [dependencies]
-ring = "^0.14"
+ring = "^0.17"
 binascii = "^0.1"
 
 [lib]
